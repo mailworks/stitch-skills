@@ -1,6 +1,6 @@
 {
   "name": "stitch-build",
-  "description": "Code generation and build tools for Google Stitch — convert designs to React components, generate walkthrough videos with Remotion, and integrate shadcn/ui.",
+  "description": "Code generation and build tools for Google Stitch — convert designs to React or Vue 3 components, generate walkthrough videos with Remotion, and integrate shadcn/ui.",
   "version": "1.0.0",
   "author": {
     "name": "google-labs-code"
@@ -11,7 +11,9 @@
   "keywords": [
     "stitch",
     "react",
+    "vue",
     "components",
+    "vue-components",
     "remotion",
     "shadcn-ui",
     "react-vite-dashboard",

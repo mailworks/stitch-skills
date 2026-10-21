@@ -8,6 +8,7 @@
     "fetch": "bash scripts/fetch-stitch.sh"
   },
   "dependencies": {
+    "@babel/parser": "^7.24.0",
     "@vue/compiler-sfc": "^3.4.0"
   },
   "engines": {

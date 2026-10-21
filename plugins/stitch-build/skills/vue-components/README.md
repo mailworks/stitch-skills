@@ -1,6 +1,6 @@
-# vue:components
+# stitch::vue-components
 
-Converts Stitch designs into modular **Vue 3** Single File Components using the Composition API (`<script setup lang="ts">`).
+Converts Stitch designs into modular **Vue 3** Single File Components using the Composition API (`<script setup lang="ts">`), or syncs existing Vue 3 components to align with the latest Stitch designs.
 
 ## Prerequisites
 

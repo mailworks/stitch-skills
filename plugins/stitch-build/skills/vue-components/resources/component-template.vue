@@ -1,18 +1,18 @@
-<template>
-  <div :class="['relative', props.class]">
-    <slot />
-  </div>
-</template>
-
 <script setup lang="ts">
 // Use a valid identifier like 'StitchComponent' as the placeholder.
 // Replace ALL occurrences of 'StitchComponent' with the actual component name.
 
 interface StitchComponentProps {
-  class?: string;
+  class?: string
 }
 
 const props = withDefaults(defineProps<StitchComponentProps>(), {
-  class: "",
-});
+  class: '',
+})
 </script>
+
+<template>
+  <div :class="['relative', props.class]">
+    <slot />
+  </div>
+</template>

@@ -1,15 +1,18 @@
 /**
  * Vue 3 SFC Validator
  * Checks that a .vue component follows the skill's architectural rules:
- *  - Has a typed defineProps<Props>() declaration
- *  - Contains no hardcoded hex color values in the template
+ *  - Uses <script setup lang="ts">
+ *  - Declares a TypeScript interface/type ending in 'Props' (e.g. ComponentProps)
+ *  - Calls typed defineProps<Props>() (with or without withDefaults)
+ *  - Contains no hardcoded hex color values across template and script
  */
 
-import { parse } from '@vue/compiler-sfc'
+import { parse as parseSFC } from '@vue/compiler-sfc'
+import { parse as parseBabel } from '@babel/parser'
 import fs from 'node:fs'
 import path from 'node:path'
 
-const HEX_COLOR_REGEX = /#[0-9A-Fa-f]{6}/g
+const HEX_COLOR_REGEX = /#[0-9A-Fa-f]{3,8}\b/g
 
 async function validateComponent(filePath) {
   if (!filePath) {
@@ -17,47 +20,136 @@ async function validateComponent(filePath) {
     process.exit(1)
   }
 
-  const source = fs.readFileSync(filePath, 'utf-8')
-  const filename = path.basename(filePath)
-
-  const { descriptor, errors } = parse(source, { filename })
-
-  if (errors.length > 0) {
-    console.error('❌ PARSE ERROR:', errors[0].message)
+  if (!fs.existsSync(filePath)) {
+    console.error(`❌ File not found: ${filePath}`)
     process.exit(1)
   }
 
+  const source = fs.readFileSync(filePath, 'utf-8')
+  const filename = path.basename(filePath)
+
+  const { descriptor, errors } = parseSFC(source, { filename })
+
+  if (errors.length > 0) {
+    console.error('❌ SFC PARSE ERROR:', errors[0].message)
+    process.exit(1)
+  }
+
+  console.log('🔍 Scanning Vue SFC AST...')
+  console.log(`--- Validation for: ${filename} ---`)
+
+  const isScriptSetup = Boolean(descriptor.scriptSetup)
   const scriptContent =
     descriptor.scriptSetup?.content ?? descriptor.script?.content ?? ''
   const templateContent = descriptor.template?.content ?? ''
 
-  // Check for typed defineProps
-  const hasDefineProps = /defineProps\s*</.test(scriptContent)
+  let hasPropsInterface = false
+  let hasTypedDefineProps = false
+  const hexIssues = []
 
-  // Check for hardcoded hex values in template
-  const hexMatches = [...templateContent.matchAll(HEX_COLOR_REGEX)].map(
+  // 1. Check for script setup
+  if (!isScriptSetup) {
+    console.error('❌ SCRIPT: Missing <script setup lang="ts"> block.')
+  }
+
+  // 2. Parse script AST
+  if (scriptContent) {
+    try {
+      const ast = parseBabel(scriptContent, {
+        sourceType: 'module',
+        plugins: ['typescript'],
+      })
+
+      const walk = (node) => {
+        if (!node || typeof node !== 'object') return
+        if (Array.isArray(node)) {
+          for (const item of node) walk(item)
+          return
+        }
+
+        // Check for Interface or Type ending with Props
+        if (
+          (node.type === 'TSInterfaceDeclaration' &&
+            node.id?.name?.endsWith('Props')) ||
+          (node.type === 'TSTypeAliasDeclaration' &&
+            node.id?.name?.endsWith('Props'))
+        ) {
+          hasPropsInterface = true
+        }
+
+        // Check for defineProps<Props>() or withDefaults(defineProps<Props>(), ...)
+        if (node.type === 'CallExpression') {
+          if (
+            node.callee?.type === 'Identifier' &&
+            node.callee.name === 'defineProps'
+          ) {
+            if (node.typeParameters && node.typeParameters.params?.length > 0) {
+              hasTypedDefineProps = true
+            }
+          }
+        }
+
+        for (const key of Object.keys(node)) {
+          if (
+            key === 'loc' ||
+            key === 'start' ||
+            key === 'end' ||
+            key === 'range'
+          )
+            continue
+          walk(node[key])
+        }
+      }
+
+      walk(ast)
+    } catch (err) {
+      console.error('❌ SCRIPT PARSE ERROR:', err.message)
+      process.exit(1)
+    }
+  }
+
+  // 3. Scan for hardcoded hex colors
+  const templateHex = [...templateContent.matchAll(HEX_COLOR_REGEX)].map(
     (m) => m[0],
   )
+  templateHex.forEach((hex) => hexIssues.push(`[template] ${hex}`))
 
-  console.log('🔍 Scanning Vue SFC...')
-  console.log(`--- Validation for: ${filename} ---`)
+  const scriptHex = [...scriptContent.matchAll(HEX_COLOR_REGEX)].map(
+    (m) => m[0],
+  )
+  scriptHex.forEach((hex) => hexIssues.push(`[script] ${hex}`))
 
-  if (hasDefineProps) {
-    console.log('✅ defineProps<Props>() declaration found.')
+  // Report results
+  if (hasPropsInterface) {
+    console.log("✅ Props interface declaration found (ends with 'Props').")
   } else {
     console.error(
-      "❌ MISSING: Typed defineProps (use defineProps<YourProps>() pattern).",
+      "❌ MISSING: Props interface (must be a TypeScript interface ending in 'Props').",
     )
   }
 
-  if (hexMatches.length === 0) {
-    console.log('✅ No hardcoded hex values found in template.')
+  if (hasTypedDefineProps) {
+    console.log('✅ Typed defineProps<Props>() call found.')
   } else {
-    console.error(`❌ STYLE: Found ${hexMatches.length} hardcoded hex codes.`)
-    hexMatches.forEach((hex) => console.error(`   - ${hex}`))
+    console.error(
+      '❌ MISSING: Typed defineProps (use defineProps<YourProps>() pattern).',
+    )
   }
 
-  if (hasDefineProps && hexMatches.length === 0) {
+  if (hexIssues.length === 0) {
+    console.log('✅ No hardcoded hex values found.')
+  } else {
+    console.error(`❌ STYLE: Found ${hexIssues.length} hardcoded hex codes.`)
+    hexIssues.forEach((issue) => console.error(`   - ${issue}`))
+  }
+
+  const isValid =
+    isScriptSetup &&
+    hasPropsInterface &&
+    hasTypedDefineProps &&
+    hexIssues.length === 0
+
+  if (isValid) {
     console.log('\n✨ COMPONENT VALID.')
     process.exit(0)
   } else {
