@@ -115,7 +115,6 @@ npx skills --help
 ```
 
 ## Prerequisites
-
 These skills require the **Stitch MCP** server to be configured and running in your agent's environment. Make sure you have followed the [Stitch MCP Setup Instructions](https://stitch.withgoogle.com/docs/mcp/setup/) to register the server and set up appropriate environment variables and credentials.
 
 > **Docs navigation:** If a link on [stitch.withgoogle.com/docs](https://stitch.withgoogle.com/docs/) redirects incorrectly, open the target path under the same host (e.g. `https://stitch.withgoogle.com/docs/learn/device-types/`).
